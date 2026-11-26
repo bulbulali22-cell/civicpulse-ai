@@ -340,10 +340,10 @@ CivicPulse AI is designed to **complement existing grievance channels**, not rep
 
 | Name | GitHub |
 |---|---|
-| Teeya Saraswat | [@username](https://github.com/) |
+| Teeya Saraswat | [@teeya831-cmd](https://github.com/teeya831-cmd) |
 | Bulbul Ali | [@bulbulali22-cell](https://github.com/bulbulali22-cell) |
 | Ariktha Upmanyu | [@arikthaupmanyu](https://github.com/arikthaupmanyu) |
-| Mahi Garg | [@username](https://github.com/) |
+| Mahi Garg | [@mahig04](https://github.com/mahig04) |
 
 ---
 
