@@ -6,14 +6,13 @@
 
 *Smarter civic systems. Stronger communities.*
 
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-Build-646CFF?logo=vite&logoColor=white)
+![React](https://img.shields.io/badge/React-Vite_SPA-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Typed-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Styling-06B6D4?logo=tailwindcss&logoColor=white)
+![Leaflet](https://img.shields.io/badge/Leaflet-Maps-199900?logo=leaflet&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase&logoColor=white)
 ![Gemini](https://img.shields.io/badge/Google_Gemini-AI-4285F4?logo=google&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)
-![Hack4Tech](https://img.shields.io/badge/Hack4Tech-2026-blueviolet)
 
 [**Live Demo**](#) · [**Report a Bug**](https://github.com/bulbulali22-cell/civicpulse-ai/issues) · [**Request a Feature**](https://github.com/bulbulali22-cell/civicpulse-ai/issues)
 
@@ -45,11 +44,11 @@
 
 ## 📖 About the Project
 
-**CivicPulse AI** connects citizens with local authorities to report, track, and resolve civic issues efficiently. A citizen snaps a photo of a problem (a pothole, overflowing garbage, a broken streetlight), the app captures the GPS location, and **Google Gemini** analyses the image to automatically identify the issue category, assign a **severity score (1-10)**, and generate a title and description.
+**CivicPulse AI** connects citizens with local authorities to report, track, and resolve civic issues efficiently. A citizen uploads a photo of a problem (a pothole, overflowing garbage, a broken streetlight), the app captures the GPS location, and **Google Gemini** analyses the image to identify the issue category, assign a **severity score (1-10)**, and generate a title and description.
 
-Every complaint lands in a live dashboard where officials can see issues on a **map with geographic hotspots**, prioritise by severity, assign them, and update their status, while citizens can track progress with a simple reference ID.
+Every complaint is stored with a reference ID (like `CP-1001`) and appears on a **public issue map with severity markers and a heatmap**. Officials get an **admin console** with stats and a priority queue to assign complaints and update their status, while citizens can follow progress on a **status timeline**.
 
-> Built for **Hack4Tech 2026** by **Team God's Favourite**, with Mathura, Uttar Pradesh as the pilot context.
+> Built by **Team God's Favourite** with Mathura, Uttar Pradesh as the pilot context.
 
 ---
 
@@ -86,31 +85,31 @@ From citizen report to real-time civic visibility, in four steps:
 ## ✨ Key Features
 
 ### 👥 For Citizens
-- 📸 **Image-based reporting**: upload a photo of the issue
-- 📍 **GPS-enabled submissions** with automatic reverse geocoding (coordinates → readable address)
-- 🤖 **AI diagnostic panel**: instantly see the detected category, severity, and generated title
-- ⚠️ **Duplicate warning**: get notified if a similar complaint already exists nearby
-- 🔎 **Track Complaint**: look up status by reference ID (e.g. `CP-1001`) with a status timeline
-- 🗺️ **Public Issue Map**: severity-coloured markers and a heatmap layer
+- 📸 **Image-based reporting**: upload a photo of the issue from the Citizen Portal
+- 📍 **GPS-enabled submissions** with reverse geocoding (lat/lng → readable address) via Nominatim
+- 🤖 **AI diagnostic panel**: see the detected category, severity, and generated title before submitting
+- ⚠️ **Duplicate warning**: a database check (`find_nearby_duplicates()`) flags similar complaints nearby
+- 🔎 **Track Complaint**: look up status by reference ID (e.g. `CP-1001`) and view a status timeline
+- 🗺️ **Public Issue Map**: Leaflet map with severity markers and a heatmap layer
 
 ### 🏛️ For Authorities
-- 🗂️ **Centralised complaint records**
-- 📊 **Admin console** with stats, a priority queue, assignment, and status updates
+- 🗂️ **Centralised complaint records** in PostgreSQL
+- 📊 **Admin Console**: stats, priority queue, assign complaints, update status
 - 🎯 **Issue-score visibility** to triage the most severe problems first
 - 🌡️ **Geographic hotspot monitoring**
-- ⏱️ **Department SLA hours** tracked per department
+- ⏱️ **Department SLA hours** stored per department
 
 ### ⚙️ Under the Hood
-- 🔐 Email + password auth with JWT
-- 🛡️ **Row Level Security (RLS)** enforced on all reads/writes
-- 🔄 Realtime updates via **Supabase Realtime**
-- 🔑 **API keys never reach the browser**: Gemini is called through a serverless function
+- 🔐 Email + password authentication with JWT (Supabase Auth)
+- 🛡️ **Row Level Security (RLS)**: the browser uses only the publishable `anon` key, and all reads/writes go through `supabase-js` under RLS
+- 🕒 **Database triggers** automatically append a timeline row whenever a complaint's status changes
+- 🔑 **The Gemini API key never reaches the browser**: analysis runs in a Vercel serverless function
 
 ---
 
 ## 📸 Screenshots
 
-> 📌 *Add your screenshots to a `/docs/screenshots` folder and update the paths below.*
+> 📌 *Add your screenshots to a `docs/screenshots` folder and update the paths below.*
 
 | Citizen Portal | Public Issue Map |
 |:---:|:---:|
@@ -124,47 +123,55 @@ From citizen report to real-time civic visibility, in four steps:
 
 ## 🏗️ System Architecture
 
-```mermaid
-flowchart LR
-    C[👤 Citizen] --> P[Citizen Portal<br/>React + Vite SPA]
-    A[🏛️ Admin / Official] --> AC[Admin Console]
+![CivicPulse System Architecture](docs/CivicPulse_Architecture.png)
 
-    P -->|image + text| F["Vercel Function<br/>POST /api/analyze"]
-    F -->|HTTPS| G[Gemini API]
-    G -->|JSON: category, severity, title| F
-    F --> P
+**Runtime flow: what happens when a complaint is filed, tracked and resolved**
 
-    P -->|reverse geocode| N[Nominatim]
-    P -->|map tiles| O[OpenStreetMap]
+| # | Step |
+|:---:|---|
+| **1** | The citizen submits a photo + GPS location through the **Citizen Portal** |
+| **2** | The browser sends image + text to **`POST /api/analyze`** (Vercel serverless function, Node.js). It validates the input, holds `GEMINI_API_KEY`, calls the **Gemini API**, and returns `category · severity · title` as JSON |
+| **3** | A **duplicate check** runs via `rpc()` on Supabase, then the complaint is **INSERT**ed through the PostgREST API (RLS enforced) |
+| **4** | The photo is saved to **Supabase Storage** (bucket: `complaint-images`) |
+| **5** | A database **trigger appends a timeline row** to `complaint_updates` |
+| **6** | The **admin/official** updates the status from the Admin Console |
 
-    P --> S[supabase-js client<br/>anon key + RLS]
-    AC --> S
-    S --> Auth[Auth<br/>email + JWT]
-    S --> St[Storage<br/>complaint-images]
-    S --> PR[PostgREST API]
-    PR --> DB[(PostgreSQL<br/>complaints · complaint_updates · departments)]
-```
+**Client modules (React + Vite SPA):** Citizen Portal · Public Issue Map · Track Complaint · Admin Console, all talking to the backend through a single `supabase-js` client.
 
-**Request flow, in short:**
-1. A citizen fills in the report form (photo + GPS).
-2. The browser sends image + text to **`/api/analyze`** (a Vercel serverless function that holds the `GEMINI_API_KEY`).
-3. Gemini returns structured JSON (category · severity · title) that is shown in the AI diagnostic panel.
-4. The photo is uploaded to **Supabase Storage**, and the complaint is written to **PostgreSQL** through PostgREST under RLS.
-5. Database logic (`find_nearby_duplicates()`, status triggers, the `complaint_stats` view) supports duplicate checks and admin stats.
-6. Officials manage complaints through the **Admin Console**; citizens follow progress on **Track Complaint**.
+**External services:** Gemini API (image + text analysis) · Nominatim (reverse geocoding) · OpenStreetMap (base-map tiles).
+
+**Database (PostgreSQL):**
+
+| Table / Object | Purpose |
+|---|---|
+| `complaints` | `ref_id`, `status`, `lat`/`lng`, `severity` |
+| `complaint_updates` | Timeline rows for each status change |
+| `departments` | Department info including SLA hours |
+| `find_nearby_duplicates()` | Duplicate-detection function |
+| status triggers | Auto-append timeline entries |
+| `complaint_stats` | View powering admin stats |
 
 ---
 
 ## 🧰 Tech Stack
 
+![CivicPulse Technology Stack](docs/CivicPulse_TechStack.png)
+
 | Layer | Technologies |
 |---|---|
-| **Presentation** | React, Vite, TypeScript, Tailwind CSS, Leaflet.js, OpenStreetMap |
-| **Client & API** | supabase-js, Vercel Serverless Function (`/api/analyze`) |
-| **Backend (BaaS)** | Supabase: Auth, PostgreSQL, Storage, PostgREST, Row Level Security |
-| **AI** | Google Gemini API (image + text analysis, structured JSON output) |
-| **Geo services** | Nominatim (reverse geocoding), OpenStreetMap tiles |
-| **Dev & Deploy** | VS Code → Git → GitHub → Vercel (CI/CD) → Production |
+| **01 · Presentation** (UI + maps) | HTML · CSS · JS, React + Vite (component SPA), TypeScript, Tailwind CSS, Leaflet.js (interactive map + heatmap), OpenStreetMap (free base-map tiles) |
+| **02 · Client & API** (access layer) | Environment config (`VITE_SUPABASE_URL`, publishable key only), `supabase-js` (queries · rpc() · auth · storage upload), Vercel Function `/api/analyze` (keeps Gemini key private) |
+| **03 · Backend** (Supabase BaaS) | Auth (email login · JWT), PostgreSQL (complaints · updates · departments), Storage (`complaint-images`), RLS + SQL (duplicate check · status triggers) |
+| **04 · AI** (Google Gemini) | Output schema (category · severity 1-10 · title · description) → Prompt template (photo + text + allowed categories) → Gemini API |
+
+### 🔄 Development & Deployment Pipeline
+
+```
+VS Code  →  Git  →  GitHub  →  Vercel  →  Production
+(source)   (commits)  (team collab)  (CI/CD · vite build · env vars)  (live site · CDN + functions)
+```
+
+Every `git push` to GitHub triggers a Vercel webhook, which builds the Vite app, deploys the SPA and the serverless function, and releases to production.
 
 ---
 
@@ -205,11 +212,11 @@ The app will be available at **http://localhost:5173**.
 1. Create a new Supabase project.
 2. Create a **Storage bucket** named `complaint-images`.
 3. Create the tables: `complaints`, `complaint_updates`, `departments`.
-4. Add the database logic: `find_nearby_duplicates()`, status triggers, and the `complaint_stats` view.
+4. Add the database logic: `find_nearby_duplicates()`, the status triggers, and the `complaint_stats` view.
 5. Enable **Row Level Security** and add policies for citizens and admins.
-6. Enable **Realtime** on the `complaints` table.
+6. Create an admin user in **Auth** (email + password) for the Admin Console.
 
-> 📌 *Tip: export your SQL schema into `/supabase/schema.sql` so teammates and judges can recreate the database in one step.*
+> 📌 *Tip: export your SQL schema to `/supabase/schema.sql` so teammates and judges can recreate the database in one step.*
 
 ### Build for Production
 
@@ -243,13 +250,13 @@ GEMINI_API_KEY=your-gemini-api-key
 
 ```
 civicpulse-ai/
-├── api/                  # Vercel serverless function (analyze)
+├── api/                  # Vercel serverless function (POST /api/analyze)
 ├── public/               # Static assets
 ├── src/                  # React + TypeScript source
 │   ├── components/       # Reusable UI components
 │   ├── pages/            # Citizen Portal, Public Map, Track, Admin Console
 │   └── lib/              # Supabase client, helpers
-├── docs/                 # Screenshots & documentation
+├── docs/                 # Diagrams & screenshots
 ├── index.html
 ├── package.json
 ├── tailwind.config.js
@@ -261,7 +268,7 @@ civicpulse-ai/
 
 ## 🤖 How the AI Analysis Works
 
-The serverless function sends the uploaded photo plus the citizen's text to Gemini with a **prompt template** that restricts output to the allowed categories, then validates and returns a fixed **output schema**:
+The serverless function receives the photo and the citizen's text, builds a **prompt template** (photo + text + allowed categories), sends it to Gemini, and returns a fixed **output schema**:
 
 ```json
 {
@@ -279,20 +286,19 @@ The serverless function sends the uploaded photo plus the citizen's text to Gemi
 | `title` | Short, auto-generated complaint title |
 | `description` | Structured description of what the image shows |
 
-> 🔒 The citizen can review the AI diagnostic before submitting, and authorities make the final decision on action.
+> 🔒 The citizen sees the AI diagnostic panel before submitting, and authorities make the final decision on action.
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Image-based reporting with GPS capture
+- [x] Image-based reporting with GPS capture and reverse geocoding
 - [x] Gemini-powered issue analysis and severity scoring
+- [x] Duplicate complaint warning (`find_nearby_duplicates()`)
 - [x] Public issue map with severity markers and heatmap
-- [x] Complaint tracking by reference ID
-- [x] Admin console with priority queue and status updates
-- [x] Real-time sync via Supabase Realtime
-- [ ] Enhanced duplicate complaint detection
-- [ ] Multilingual voice reporting (Hindi + regional languages)
+- [x] Complaint tracking by reference ID with status timeline
+- [x] Admin console with stats, priority queue, assignment and status updates
+- [ ] Multilingual voice reporting
 - [ ] Automated department-wise assignment
 - [ ] Predictive civic analytics
 - [ ] Integration pathways with existing channels (Swachhata, UP IGRS)
@@ -330,13 +336,13 @@ CivicPulse AI is designed to **complement existing grievance channels**, not rep
 
 ## 👨‍💻 Team
 
-**Team God's Favourite**: Hack4Tech 2026
+**Team God's Favourite**
 
 | Name | GitHub |
 |---|---|
 | Teeya Saraswat | [@username](https://github.com/) |
 | Bulbul Ali | [@bulbulali22-cell](https://github.com/bulbulali22-cell) |
-| Ariktha Upmanyu | [@username](https://github.com/) |
+| Ariktha Upmanyu | [@arikthaupmanyu](https://github.com/arikthaupmanyu) |
 | Mahi Garg | [@username](https://github.com/) |
 
 ---
@@ -368,4 +374,9 @@ Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
 **Smarter civic systems. Stronger communities.** 🏙️
 
+⭐ If you like this project, give it a star!
+
 </div>
+
+
+
